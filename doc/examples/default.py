@@ -10,7 +10,7 @@ name = 'system_default'
 os = 'unix'
 
 # The absolute path to the folder containing materials properties
-mat_library = '~/Documents/Analysis/ddscat/mp/'
+mat_library = '~/Documents/codes/dda/mp/'
 
 # The absolute path to the folder containing the DDSCAT executable
 ddscat_path = ''

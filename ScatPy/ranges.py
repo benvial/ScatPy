@@ -5,7 +5,7 @@ A collection of ranges found in ddscat.par
 """
 
 
-from __future__ import division
+
 import numpy as np
 
 
@@ -54,7 +54,7 @@ class How_Range():
         self.current=0
         return self
     
-    def next(self):
+    def __next__(self):
         if self.current==len(self.table):
             raise StopIteration
         

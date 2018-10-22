@@ -4,23 +4,23 @@ Target definitions.
 
 """
 
-from __future__ import division
+
 import subprocess
 import numpy as np
 import os
 import os.path
 import copy
-import results
+from . import results
 import warnings
 import pdb
 import matplotlib as mpl
 
-import utils
-import fileio
-import ranges
+from . import utils
+from . import fileio
+from . import ranges
 
 #: Default spacing between dipoles (in um)
-default_d=0.015 
+default_d=0.015
 
 class Target(object):
     """
@@ -41,7 +41,7 @@ class Target(object):
     Typically, this class will be subclassed to create more useful and feature-
     rich targets. Derived classes *must* provide the following attributes and
     methods:
-    * sh_param: A property that returns the three values of the SHPAR definition used by DDSCAT 
+    * sh_param: A property that returns the three values of the SHPAR definition used by DDSCAT
     * _calc_N(): A static method to calculate the number of dipoles based on the shape parameters
     * fromfile(): A class method to generate a working object from a ddscat.par file
 
@@ -50,9 +50,9 @@ class Target(object):
     def __init__(self, directive=None, sh_param=None, material=None, aeff=None, folder=None):
 
         if (directive is None) or (material is None):
-            # If available, settings come from default.par file       
+            # If available, settings come from default.par file
             default = utils.resolve_profile('default.par')
-            if default is not None: 
+            if default is not None:
                 vals = self._read_values(default)
                 if directive is None:
                     directive= vals['directive']
@@ -61,38 +61,38 @@ class Target(object):
                     self.aeff = aeff
                 elif material is None:
                     material = vals['material']
-            
+
         self.directive = directive
-        
+
         if isinstance(material, (list, tuple)):
             self.material = list(material)
         elif isinstance(material, str):
             self.material = [material]
         else:
             raise TypeError('Material must be a string or list of strings')
-            
+
         if sh_param:
             self.sh_param = sh_param
 
         if aeff is not None:
             self.aeff = aeff
-                
+
         if folder is None:
             self._folder='.'
         else:
             self._folder=folder
-            
+
     def save_str(self):
         """Return the multi-line target definition string for the ddscat.par file"""
         out='**** Target Geometry and Composition ****\n'
         out+=self.directive+'\n'
-        out+=str(tuple(self.sh_param)).translate(None, '(),')+'\n'
+        out+=str(tuple(self.sh_param)).translate(str.maketrans('', '', '(),'))+'\n'
         out+=str(len(self.material))+'\n'
         for mat in self.material:
             out+='\''+utils.resolve_mat_file(mat)+'\'\n'
-        
+
         return out
-    
+
     def write(self):
         pass
 
@@ -102,26 +102,26 @@ class Target(object):
 
         if outfile is None:
             outfile='output'
-            
+
         self.write()
-            
+
         if os.path.exists(os.path.join(self.folder, self.fname)):
             #This assumes that vtrconvert is in your path
             #check os.environ['PATH'] to be sure
             subprocess.call(['vtrconvert', self.fname, outfile], cwd=self.folder)
         else:
-            print 'No target.out file to convert'
+            print('No target.out file to convert')
 
     @property
     def folder(self):
         """The target working directory"""
         return self._folder
-        
+
     @folder.setter
     def folder(self, newfolder):
         """Redefine the target working directory"""
         self._folder=newfolder
-    
+
     def copy(self):
         return copy.deepcopy(self)
 
@@ -129,8 +129,8 @@ class Target(object):
     def fromfile(cls, fname):
         """
         Load target definition from the specified file.
-        
-        If the target directive matches the name of an existing target class 
+
+        If the target directive matches the name of an existing target class
         then object creation is delegated to that class.
         """
         t_vals = cls._read_values(fname)
@@ -148,23 +148,23 @@ class Target(object):
     @classmethod
     def _read_values(cls, fname):
         """
-        Load target definition from the specified file.        
+        Load target definition from the specified file.
         """
 
         f = open(fname, 'Ur')
         lines = [fileio._parseline(l) for l in f.readlines()]
         f.close()
-    
+
         values = {}
         values['directive'] = lines[10]
-        
+
         sh_param = []
         for s in lines[11].split():
             try:
                 sh_param.append(int(s))
             except ValueError:
                 sh_param.append(s)
-        values['sh_param'] = tuple(sh_param)   
+        values['sh_param'] = tuple(sh_param)
 
         n_mat = int(lines[12])
         values['material'] = lines[13: 13+n_mat]
@@ -184,14 +184,14 @@ class Target(object):
         elif (aeff and N) and not d:
             return aeff / (N*3/4/np.pi)**(1/3)
         elif (d and N) and not aeff:
-            return (N*3/4/np.pi)**(1/3) * d            
+            return (N*3/4/np.pi)**(1/3) * d
         else:
             raise ValueError('Requires two out of three parameters')
 
     def make_periodic(self, period):
         """
         Return a periodic version of this target, if one is available.
-        
+
         :period: The unit vector in um. A component = 0: no repetition
         """
 
@@ -207,7 +207,7 @@ class Target(object):
         if new_cls is None:
             raise TypeError('No corresponding periodic class for %s.' % str(self.__class__))
 
-        new = copy.deepcopy(self)                
+        new = copy.deepcopy(self)
         new.__class__ = new_cls
         new.period = period
         new.directive = new_cls.directive
@@ -217,32 +217,32 @@ class Target(object):
 class Target_Builtin(Target):
     """
     Base class for the standard target geometries that are built into DDSCAT.
-    
+
     :param directive: The type of target (e.g. 'CYLINDER1', 'ELLIPSOID')
-    :param d: The dipole density. Default is taken from targets.default_d.        
+    :param d: The dipole density. Default is taken from targets.default_d.
     :param material: A string, or list of strings specifying the material
                      file(s) to use for the target. Default is taken from default.par.
     :param folder: The target working directory. The default is the CWD.
 
     Typically, this class will be subclassed to create more useful and feature-
     rich targets. Classes should take their names from the name used by DDSCAT
-    (e.g. RCTGLPRSM, ELLIPSOID). 
-    
+    (e.g. RCTGLPRSM, ELLIPSOID).
+
     Target subclasses constructed with :class:``Target_Builtin``
-    are intended to work with physical units rather than dipole units used in 
+    are intended to work with physical units rather than dipole units used in
     :class:``Target``. Therefore, derived classes *must* provide the following
     attributes and methods for converting between physical dimensions and the
     internal representation understood by DDSCAT:
-    * sh_param: A property that returns the three values of the SHPAR definition used by DDSCAT 
+    * sh_param: A property that returns the three values of the SHPAR definition used by DDSCAT
     * _calc_N(): A static method to calculate the number of dipoles based on the shape parameters
     * fromfile(): A class method to generate a working object from a ddscat.par file
     """
     def __init__(self, directive, d=None, material=None, folder=None):
 
         Target.__init__(self, directive, material=material, folder=folder)
-        
+
         self.d = d if d else default_d
-    
+
     @property
     def sh_param(self):
         """
@@ -252,7 +252,7 @@ class Target_Builtin(Target):
         the internally stored physical dimensions (e.g. self.radius, self.length)
         and translate them into a tuple of shape parameters that DDSCAT expects for
         this target type.
-        
+
         This would be a good application for ABCs.
         """
         raise NotImplementedError('Subclasses should implement this method')
@@ -263,11 +263,11 @@ class Target_Builtin(Target):
         Unimplemented method for calculating the number of dipoles.
 
         Subclasses must implement this themselves. The method should accept
-        DDSCAT shape parameters and return the number of dipoles for the 
+        DDSCAT shape parameters and return the number of dipoles for the
         target they describe. It is a staticmethod because it must be
         accessible by the classmethod fromfile() before the new object is
         instantiated. For convenience it is wrapped by the property obj.N.
-        
+
         This would be a good application for ABCs.
         """
         raise NotImplementedError('Subclasses should implement this method')
@@ -276,32 +276,32 @@ class Target_Builtin(Target):
     def fromfile(cls, fname):
         """
         Unimplemented method for loading target from file.
-        
-        Subclasses must implement this themselves. The form is to load the 
+
+        Subclasses must implement this themselves. The form is to load the
         target information from the par file using _read_values(). Then parse
         those values and pass them to the class's initializer.
-        
+
         This would be a good application for ABCs.
         """
         raise NotImplementedError('Subclasses should implement this method')
-        
+
     @property
     def N(self):
         """Calculate the numner of dipoles in the target"""
-    
+
         return self._calc_N(self.sh_param)
-        
+
     @property
     def aeff(self):
         """Calculate the effective diameter of the target"""
-    
-        return self._calc_size(N=self.N, d=self.d)           
+
+        return self._calc_size(N=self.N, d=self.d)
         #return (self.N*3/4/np.pi)**(1/3)*self.d
 
 
-class RCTGLPRSM(Target_Builtin):        
+class RCTGLPRSM(Target_Builtin):
     """A rectangular prism target
-    
+
     :param phys_shape: (length, width, height) of the prism in microns
     :param d: The dipole density. Default is taken from targets.default_d.
     :param material: A string, or list of strings specifying the material
@@ -317,16 +317,16 @@ class RCTGLPRSM(Target_Builtin):
     @property
     def sh_param(self):
         """The shape parameters based on the physical shape"""
-        
+
         return tuple(np.around(self.phys_shape/self.d).astype(int))
 
     @staticmethod
     def _calc_N(sh_param):
         """Calculate the number of dipoles
-        
+
         :param sh_param: size in dipoles
         """
-        return np.array(sh_param[0:3]).prod()        
+        return np.array(sh_param[0:3]).prod()
 
     @classmethod
     def fromfile(cls, fname):
@@ -341,7 +341,7 @@ class RCTGLPRSM(Target_Builtin):
         return cls(phys_shape, d, vals['material'])
 
 
-class Cube(RCTGLPRSM):  
+class Cube(RCTGLPRSM):
     """
     A Cube target.
 
@@ -350,7 +350,7 @@ class Cube(RCTGLPRSM):
     :param material: A string, or list of strings specifying the material
                      file(s) to use for the target. Default is taken from default.par.
     :param folder: The target working directory. The default is the CWD.
-    """      
+    """
     def __init__(self, length, d=None, material=None, folder=None):
         RCTGLPRSM.__init__(self, (length,)*3, d=d, material=material, folder=folder)
 
@@ -359,14 +359,14 @@ class CYLNDRCAP(Target_Builtin):
     Homogeneous, isotropic finite cylinder with hemispherical endcaps.
 
     :param length: the length of the cylinder in microns (not including endcaps)
-    :param radius: the radius of the cylinder    
+    :param radius: the radius of the cylinder
     :param d: The dipole density. Default is taken from targets.default_d.
     :param material: A string, or list of strings specifying the material
                      file(s) to use for the target. Default is taken from default.par.
     :param folder: The target working directory. The default is the CWD.
 
     Total height of the structureis length+2*rad
-    
+
     """
 
     def __init__(self, length, radius, d=None, material=None, folder=None):
@@ -381,19 +381,19 @@ class CYLNDRCAP(Target_Builtin):
         return (int(round(self.length/self.d)),
                 int(round(2 * self.radius/self.d)),
                 0)
-                                 
+
     @staticmethod
     def _calc_N(sh_param):
         """Calculate the number of dipoles
-        
+
         :param sh_param: size in dipoles
         """
         length = sh_param[0]
         diam = sh_param[1]
         Vcyl=length*(np.pi*(diam/2)**2)
         Vsph=4/3*np.pi*(diam/2)**3
-        return int(Vcyl+Vsph)        
-    
+        return int(Vcyl+Vsph)
+
     @classmethod
     def fromfile(cls, fname):
         """
@@ -407,9 +407,9 @@ class CYLNDRCAP(Target_Builtin):
         phys_shape = np.array(sh_param) * d
         length , radius = phys_shape[0], phys_shape[1]/2
         return cls(length, radius, d, vals['material'])
-        
 
-class ELLIPSOID(Target_Builtin):        
+
+class ELLIPSOID(Target_Builtin):
     """
     An Ellipsoid target
 
@@ -419,9 +419,9 @@ class ELLIPSOID(Target_Builtin):
                      file(s) to use for the target. Default is taken from default.par.
     :param folder: The target working directory. The default is the CWD.
     """
-    
+
     def __init__(self, semiaxes, d=None, material=None, folder=None):
-                
+
         Target_Builtin.__init__(self, 'ELLIPSOID', d=d, material=material, folder=folder)
         self.semiaxes = np.array(semiaxes)
 
@@ -430,16 +430,16 @@ class ELLIPSOID(Target_Builtin):
         """Calculate the shape parameters"""
 
         return tuple(2 * np.around(self.semiaxes/self.d).astype(int))
-        
+
     @staticmethod
     def _calc_N(sh_param):
         """Calculate the number of dipoles
-        
+
         :param sh_param: size in dipoles
         """
 
         return int(4/3*np.pi*(np.asarray(sh_param).prod()/8))
-    
+
     @classmethod
     def fromfile(cls, fname):
         """
@@ -454,7 +454,7 @@ class ELLIPSOID(Target_Builtin):
         return cls(semiaxes, d, vals['material'])
 
 
-class Sphere(ELLIPSOID):  
+class Sphere(ELLIPSOID):
     """
     A Sphere target.
 
@@ -463,13 +463,13 @@ class Sphere(ELLIPSOID):
     :param material: A string, or list of strings specifying the material
                      file(s) to use for the target. Default is taken from default.par.
     :param folder: The target working directory. The default is the CWD.
-    """      
+    """
     def __init__(self, radius, d=None, material=None, folder=None):
         ELLIPSOID.__init__(self, (radius,)*3, d=d, material=material, folder=folder)
 
 class CYLINDER(Target_Builtin):
     """
-    Homogeneous, isotropic finite cylinder    
+    Homogeneous, isotropic finite cylinder
 
     :param length: the length of the cylinder in microns (not including endcaps)
     :param radius: the radius of the cylinder
@@ -483,15 +483,15 @@ class CYLINDER(Target_Builtin):
     :param folder: The target working directory. The default is the CWD.
 
     """
-    
-    def __init__(self, length, radius, orient, d=None, material=None, folder=None):    
+
+    def __init__(self, length, radius, orient, d=None, material=None, folder=None):
 
         self.length=length
         self.radius=radius
         self.orient=orient
-        
+
         Target_Builtin.__init__(self, 'CYLINDER1', d=d, material=material, folder=folder)
-        
+
     @property
     def sh_param(self):
         """Calculate the shape parameters"""
@@ -503,11 +503,11 @@ class CYLINDER(Target_Builtin):
     @staticmethod
     def _calc_N(sh_param):
         """Calculate the number of dipoles
-        
+
         :param sh_param: size in dipoles
         """
         return int(sh_param[0]*(np.pi*(sh_param[1]/2)**2))
-    
+
     @classmethod
     def fromfile(cls, fname):
         """
@@ -521,12 +521,12 @@ class CYLINDER(Target_Builtin):
         phys_shape = np.array(sh_param) * d
         length, radius, orient = phys_shape[0], phys_shape[1]*2, phys_shape[2]
         return cls(length, radius, orient, vals['material'])
-        
-            
+
+
 
 ### Arbitrarily Shaped Targets
 
-        
+
 class FROM_FILE(Target):
     '''
     Base class for targets of arbitrary geometry.
@@ -542,16 +542,16 @@ class FROM_FILE(Target):
 
     FROM_FILE does not inherit from Target_Builtin so for the purposes of inheritence
     it is not considered a builtin target.
-    
+
     '''
-    def __init__(self, grid=None, d=None, material=None, folder=None):    
+    def __init__(self, grid=None, d=None, material=None, folder=None):
         Target.__init__(self, 'FROM_FILE', material=material, folder=folder)
 
         self.description=''
         self.fname='shape.dat'
 
-        self.d = d if d else default_d    
-    
+        self.d = d if d else default_d
+
         if grid is not None:
             self.grid=grid
         else:
@@ -560,12 +560,12 @@ class FROM_FILE(Target):
         self.a1=np.array([1,0,0])
         self.a2=np.array([0,1,0])
         self.rel_d=np.array([1,1,1])
-        self.origin=np.array((0,0,0))        
+        self.origin=np.array((0,0,0))
 
     @property
     def aeff(self):
         """Calculate the effective diameter of the target"""
-                    
+
         return (self.N*3/4/np.pi)**(1/3)*self.d
 
     @property
@@ -574,30 +574,30 @@ class FROM_FILE(Target):
         The dimensions of the target in dipole units
         """
         return self.grid.shape[:3]
-    
+
     @property
     def N(self):
         """The number of dipoles"""
         if len(self.grid.shape)==4:
-            flat = self.grid.sum(3).astype(np.bool)        
+            flat = self.grid.sum(3).astype(np.bool)
         else:
             flat = self.grid.astype(np.bool)
-            
+
         return flat.sum()
-            
+
     def write(self):
         """Write the shape file."""
-        with open(os.path.join(self.folder, self.fname), 'wb') as f:
-            f.write(self.description+'\n') 
+        with open(os.path.join(self.folder, self.fname), 'wt') as f:
+            f.write(self.description+'\n')
             f.write(str(self.N)+'\n')
             f.write(str(self.a1)[1:-1]+'\n')
             f.write(str(self.a2)[1:-1]+'\n')
             f.write(str(self.rel_d)[1:-1]+'\n')
             f.write(str(self.origin/self.d)[1:-1]+'\n')
             f.write('J JX JY JZ ICOMPX,ICOMPY,ICOMPZ'+'\n')
-            
+
             table = self._grid2table()
-            
+
             for (n, val) in enumerate(table):
                 f.write('%d %d  %d  %d  %d  %d  %d\n' % ((n+1, )+tuple(val)))
 
@@ -615,7 +615,7 @@ class FROM_FILE(Target):
         table = np.zeros((self.N, 6))
 
         entries = np.transpose(grid.nonzero())
-        
+
         for (n, pt) in enumerate(entries):
 
             val = self.grid[tuple(pt)]
@@ -625,7 +625,7 @@ class FROM_FILE(Target):
                 table[n] = np.hstack((pt,) + (val,)*3)
             else: # Anisotropic case
                 table[n] = np.hstack((pt, val))
-                
+
         return table
 
     @staticmethod
@@ -637,7 +637,7 @@ class FROM_FILE(Target):
         targets.
         Tables are assumed to be 1-based (i.e. the lowest index is 1)
         """
-        
+
         x,y,z = table[:,0]-1, table[:,1]-1, table[:,2]-1
         nx, ny, nz = table[:,3], table[:,4], table[:,5]
 #        ncomp = len(set(nx), set(ny), set(nz))
@@ -655,21 +655,21 @@ class FROM_FILE(Target):
     def fromfile(cls, fname):
         """
         Load target definition from the specified .par file.
-        
+
         Assumes that the accompanying shape.dat file is in the same folder.
 
         This function currently assumes that the target basis vectors are
-        orthonormal.        
+        orthonormal.
         """
         vals = cls._read_values(fname)
 
         aeff = vals['aeff'].first
 
         h,_ = os.path.split(fname)
-        shape_file = os.path.join(h, 'shape.dat') 
+        shape_file = os.path.join(h, 'shape.dat')
         shape = results.ShapeTable(fname=shape_file)
 
-        grid = cls._table2grid(shape.data[:,1:])        
+        grid = cls._table2grid(shape.data[:,1:])
 
         d = cls._calc_size(aeff=aeff, N=len(shape.data))
 
@@ -684,37 +684,37 @@ class FROM_FILE(Target):
     def fromfunction(cls, func, pt1, pt2, origin=None, d=None, material=None, folder=None, **kwargs):
         """
         Generate a target from a function.
-        
+
         :param func: The generating function. Returns integers corresponding to material
                      index when evaluated at each point in the target volume
         :param pt1: One corner of the target volume, (xmin, ymin, zmin), in um.
         :param pt2: The opposite corner of the target volume, (xmax, ymax, zmax), in um.
         :param origin: The origin of the target (in um)
         :param kwargs: Further kwargs are passed to func
-        
-        See numpy.fronfunction for details on the function func.        
-        
+
+        See numpy.fronfunction for details on the function func.
+
         """
-    
+
         pt1=np.array(pt1)
         pt2=np.array(pt2)
-        
+
         if origin:
             origin=np.array(origin)
         else:
             origin = 0.5 * (pt1+pt2)
-    
+
         val = func(*origin)
-        
+
         try:
             len(val)
         except TypeError:
-            target = Iso_FROM_FILE(d=d, material=material, folder=folder)        
-        else:      
-            target = FROM_FILE(d=d, material=material, folder=folder)        
-        
+            target = Iso_FROM_FILE(d=d, material=material, folder=folder)
+        else:
+            target = FROM_FILE(d=d, material=material, folder=folder)
+
         target.phys_shape = pt2 - pt1
-    
+
         d_shape = np.ceil((pt2-pt1)/target.d).astype(int)
         d_pt1 = np.around(pt1/target.d).astype(int)
 
@@ -722,7 +722,7 @@ class FROM_FILE(Target):
             """
             Take a function that accepts coordinates in physical units and make it
             accept units in dipole space.
-        
+
             :param func: a function that accepts three arguments (x,y,z) in um.
             :param d: the dipole spacing.
             :param offset: an offset, in dipole units.
@@ -731,15 +731,15 @@ class FROM_FILE(Target):
             def index_func(i,j,k, **kwargs):
                 x,y,z = (i + offset[0])*d , (j + offset[1])*d, (k + offset[2])*d
                 return func(x, y, z, **kwargs)
-        
+
             return index_func
-    
+
         i_func = index_space(func, target.d, d_pt1, **kwargs)
         target.grid = np.fromfunction(i_func, d_shape)
-        
+
         return target
 
-    
+
     def VTRconvert(self, outfile=None):
         """Execute VTRConvert to generate a model file viewable in Paraview"""
         Target.VTRconvert(self, outfile)
@@ -747,8 +747,8 @@ class FROM_FILE(Target):
 
     def show(self, *args, **kwargs):
         """
-        Display the dipoles using Mayavi. 
-        
+        Display the dipoles using Mayavi.
+
         Currently assumes that all dipoles are isotropic.
         """
         from mayavi import mlab
@@ -759,14 +759,14 @@ class FROM_FILE(Target):
         if 'mask_points' in kwargs:
             mask_points=kwargs.pop('mask_points')
         elif self.N>max_points:
-            print 'Warning! Large number of datapoints in target.'
-            print 'Plotting only a subset. Specify mask_points=None or an integer to force skipping value'
+            print('Warning! Large number of datapoints in target.')
+            print('Plotting only a subset. Specify mask_points=None or an integer to force skipping value')
             mask_points=int(self.N/max_points)
         else:
             mask_points=1
-        
-        table = self._grid2table()        
-        
+
+        table = self._grid2table()
+
         X=table[:, 0][::mask_points]
         Y=table[:, 1][::mask_points]
         Z=table[:, 2][::mask_points]
@@ -782,12 +782,12 @@ class FROM_FILE(Target):
         mlab.plot3d(Box[:,0], Box[:,1], Box[:,2], name='Target Volume')
 
 
-        # Draw the target                        
+        # Draw the target
         #
         # Create unconnected points
         pts = mlab.pipeline.scalar_scatter(X,Y,Z, c, name='Dipoles') #, scale_mode='none', *args, **kwargs)
 #        mlab.outline(pts)
-        
+
         # Use a geometry_filter to filter with a bounding box
         geometry_filter = mlab.pipeline.user_defined(pts,
                                            filter='GeometryFilter', name='VisibleVolume')
@@ -799,20 +799,20 @@ class FROM_FILE(Target):
  #                   data_z_min=0, data_z_max=1,
  #                   filter=geometry_filter.filter)
  #       extent_dialog.edit_traits()
-        
+
         # The geometry_filter leaves hanging points, we need to add a
         # CleanPolyData filter to get rid of these.
         clip = mlab.pipeline.user_defined(geometry_filter,
                                             filter='CleanPolyData')
-        
+
         # Finally, visualize the remaining points with spheres using a glyph
         # module
         spheres = mlab.pipeline.glyph(clip, scale_mode='none')
 
   #      mlab.points3d(X, Y, Z, c, scale_mode='none', *args, **kwargs)
         mlab.show()
-    
-    
+
+
 
 class Iso_FROM_FILE(FROM_FILE):
     '''
@@ -822,20 +822,20 @@ class Iso_FROM_FILE(FROM_FILE):
     :param material: A string, or list of strings specifying the material
                      file(s) to use for the target. Default is taken from default.par.
     :param folder: The target working directory. The default is the CWD.
-    
+
     The major difference is that the grid in this case has only one value
-    at each dipole.    
-    
+    at each dipole.
+
     '''
 
-    def __init__(self, grid=None, d=None, material=None, folder=None):    
+    def __init__(self, grid=None, d=None, material=None, folder=None):
 
         if grid is None:
             grid=np.zeros((0,0,0), dtype=int)
 
         FROM_FILE.__init__(self, grid, d=d, material=material, folder=folder)
 
-    
+
 class Ellipsoid_FF(Iso_FROM_FILE):
     """
     Build an ellipsoidal target to be loaded from file
@@ -850,15 +850,15 @@ class Ellipsoid_FF(Iso_FROM_FILE):
     def __init__(self, semiaxes, d=None, material=None, folder=None):
         """
         Create a new Ellipsoid Target
-        
+
         """
         Iso_FROM_FILE.__init__(self, d=d, material=material, folder=folder)
 
         self.phys_shape = 2 *np.array(semiaxes)
-        self.description='Ellipsoid_FF (%f, %f, %f, %f)'%(tuple(self.phys_shape)+(self.d,))            
-        
+        self.description='Ellipsoid_FF (%f, %f, %f, %f)'%(tuple(self.phys_shape)+(self.d,))
+
         (a,b,c) = tuple(self.d_shape)
-        xx,yy,zz=np.mgrid[-a:a, -b:b, -c:c] 
+        xx,yy,zz=np.mgrid[-a:a, -b:b, -c:c]
         dist=(xx/a)**2 + (yy/b)**2 + (zz/c)**2
 
         self.grid = (dist<1).astype(int)
@@ -872,12 +872,12 @@ class Helix(Iso_FROM_FILE):
     :param height: the height of the helix (not counting it's thickness)
     :param pitch: the helix pitch, um/turn
     :param major_r: the radius of the helix sweep
-    :param minor_r: the radius of the wire that is swept to form the helix    
+    :param minor_r: the radius of the wire that is swept to form the helix
     :param d: The dipole density. Default is taken from targets.default_d.
     :param material: A string, or list of strings specifying the material
                      file(s) to use for the target. Default is taken from default.par.
     :param folder: The target working directory. The default is the CWD.
-    
+
     """
     def __init__(self, height, pitch, major_r, minor_r, d=None, material=None, folder=None):
 
@@ -899,14 +899,14 @@ class Helix(Iso_FROM_FILE):
         d_shape+=1
         self.grid=np.zeros(d_shape, dtype=int)
 
-        self.description='FROM_FILE_Helix (%f, %f, %f, %f, %f)'%(self.height, self.pitch, self.major_r, self.minor_r, self.d)            
-        
-        print 'Generating Helix...'
+        self.description='FROM_FILE_Helix (%f, %f, %f, %f, %f)'%(self.height, self.pitch, self.major_r, self.minor_r, self.d)
+
+        print('Generating Helix...')
         #the helix dimensions in pixels
         p_height=self.height/self.d
         p_pitch=-self.pitch/self.d
         p_major_r=self.major_r/self.d
-        p_minor_r=self.minor_r/self.d        
+        p_minor_r=self.minor_r/self.d
         p_origin = self.origin/self.d
 
         #the sweep path
@@ -915,21 +915,21 @@ class Helix(Iso_FROM_FILE):
         x=p_height*t + p_minor_r
         y=p_major_r * np.cos(2*np.pi* x/p_pitch) + p_origin[1]
         z=p_major_r * np.sin(2*np.pi* x/p_pitch) + p_origin[2]
-        
+
         p=np.vstack([x,y,z]).transpose()
 #        p=np.vstack([np.array(u) for u in set([tuple(l) for l in p])]) #remove duplicates
-        print 'Done constructing sweep path...'
+        print('Done constructing sweep path...')
         def dist(v):
             return np.sqrt(v[:,0]**2 +v[:,1]**2 + v[:,2]**2)
-            
+
         def sphere_check(i, j, k):
-            
+
             d=dist(np.array([i,j,k])-p)
             if np.any(d<=p_minor_r):
                 return 1
             else:
                 return 0
-                
+
         for i in range(d_shape[0]):
             for j in range(d_shape[1]):
                 for k in range(d_shape[2]):
@@ -939,9 +939,9 @@ class Helix(Iso_FROM_FILE):
 class SpheresHelix(Iso_FROM_FILE):
     """
     A helix target composed of isolated spheres
-            
+
     Dimensions are physical, in um.
-    
+
     :param height: the height of the helix (not counting it's thickness)
     :param pitch: the helix pitch, um/turn
     :param major_r: the radius of the helix sweep
@@ -949,7 +949,7 @@ class SpheresHelix(Iso_FROM_FILE):
     :param n_sphere: the number of spheres that compose the helix
     :param d: the dipole dipole spacing, if not specified default value is used
     :param build: if False, delays building the helix until requested. default is True
-        
+
     """
     def __init__(self, height, pitch, major_r, minor_r, n_sphere, d=None, build=True, **kwargs):
 
@@ -969,39 +969,39 @@ class SpheresHelix(Iso_FROM_FILE):
         if build:
             self.build_helix()
         else:
-            self.description='FROM_FILE_Helix (%f, %f, %f, %f, %f)'%(self.height, self.pitch, self.major_r, self.minor_r, self.d)            
+            self.description='FROM_FILE_Helix (%f, %f, %f, %f, %f)'%(self.height, self.pitch, self.major_r, self.minor_r, self.d)
 
     def build_helix(self):
 
-        self.description='FROM_FILE_Helix (%f, %f, %f, %f, %f)'%(self.height, self.pitch, self.major_r, self.minor_r, self.d)            
-        
-        print 'Generating Helix...'
+        self.description='FROM_FILE_Helix (%f, %f, %f, %f, %f)'%(self.height, self.pitch, self.major_r, self.minor_r, self.d)
+
+        print('Generating Helix...')
         #the helix dimensions in pixels
         p_height=self.height/self.d
         p_pitch=-self.pitch/self.d
         p_major_r=self.major_r/self.d
-        p_minor_r=self.minor_r/self.d      
+        p_minor_r=self.minor_r/self.d
 
         #the sweep path
         t=np.linspace(0,1, self.n_sphere)
         x=p_height*t + p_minor_r
         y=p_major_r * np.cos(2*np.pi* p_height/p_pitch*t) + self.origin[1]
         z=p_major_r * np.sin(2*np.pi* p_height/p_pitch*t) + self.origin[2]
-        
+
         p=np.vstack([x,y,z]).transpose()
 #        p=np.vstack([np.array(u) for u in set([tuple(l) for l in p])]) #remove duplicates
-        print 'Done constructing sweep path...'
+        print('Done constructing sweep path...')
         def dist(v):
             return np.sqrt(v[:,0]**2 +v[:,1]**2 + v[:,2]**2)
-            
+
         def sphere_check(i, j, k):
-            
+
             d=dist(np.array([i,j,k])-p)
             if np.any(d<=p_minor_r):
                 return 1
             else:
                 return 0
-                
+
         for i in range(self.d_shape[0]):
             for j in range(self.d_shape[1]):
                 for k in range(self.d_shape[2]):
@@ -1023,7 +1023,7 @@ class Conical_Helix(Iso_FROM_FILE):
     :param minor_r: the radius of the wire that is swept to form the helix
     :param d: the dipole dipole spacing, if not specified default value is used
     :param build: if False, delays building the helix until requested. default is True
-    
+
     """
     def __init__(self, height, pitch1, pitch2, major_r, minor_r, d=None, build=True, **kwargs):
 
@@ -1043,51 +1043,51 @@ class Conical_Helix(Iso_FROM_FILE):
         if build:
             self.build_helix()
         else:
-            self.description='FROM_FILE_Helix (%f, %f, %f, %f, %f, %f)'%(self.height, self.pitch1, self.pitch2, self.major_r, self.minor_r, self.d)            
+            self.description='FROM_FILE_Helix (%f, %f, %f, %f, %f, %f)'%(self.height, self.pitch1, self.pitch2, self.major_r, self.minor_r, self.d)
 
     def build_helix(self):
 
-        self.description='FROM_FILE_Helix (%f, %f,%f, %f, %f, %f)'%(self.height, self.pitch1, self.pitch2, self.major_r, self.minor_r, self.d)            
-        
-        print 'Generating Helix...'
+        self.description='FROM_FILE_Helix (%f, %f,%f, %f, %f, %f)'%(self.height, self.pitch1, self.pitch2, self.major_r, self.minor_r, self.d)
+
+        print('Generating Helix...')
         #the helix dimensions in pixels
         p_height=(self.height*(1-(self.pitch2-self.pitch1)/self.pitch2))/self.d
         p_pitch1=-self.pitch1/self.d
         p_pitch2=-self.pitch2/self.d
         p_major_r=self.major_r/self.d
-        p_minor_r=self.minor_r/self.d        
+        p_minor_r=self.minor_r/self.d
 
         #the sweep path
-        
+
         t=np.linspace(0,1, self.height/abs(self.pitch1)*360)
         k=p_height*(1+t*(p_pitch2-p_pitch1)/p_pitch2)
-       
+
         P=t*k
         R= t*p_major_r
-        
-        
-        
+
+
+
         x=P + p_minor_r
         phi=2*np.pi* t*p_height/p_pitch1
         y=R* np.cos(phi) + self.origin[1]
         z=R* np.sin(phi) + self.origin[2]
 
 
-       
+
         p=np.vstack([x,y,z]).transpose()
-        
-        print 'Done constructing sweep path...'
+
+        print('Done constructing sweep path...')
         def dist(v):
             return np.sqrt(v[:,0]**2 +v[:,1]**2 + v[:,2]**2)
-            
+
         def sphere_check(i, j, k):
-            
+
             d=dist(np.array([i,j,k])-p)
             if np.any(d<=p_minor_r):
                 return 1
             else:
                 return 0
-                
+
         for i in range(self.d_shape[0]):
             for j in range(self.d_shape[1]):
                 for k in range(self.d_shape[2]):
@@ -1109,25 +1109,25 @@ class Polygon(Iso_FROM_FILE):
     :param d: the dipole dipole spacing, if not specified default value is used
     :param material: A string specifying the material
                      file to use for the target. Default is taken from default.par.
-    :param folder: The target working directory. The default is the CWD.        
-    
-    Dipoles within the polygon correspond to material, outside to ambient.    
-    
+    :param folder: The target working directory. The default is the CWD.
+
+    Dipoles within the polygon correspond to material, outside to ambient.
+
     """
     def __init__(self, polygon, thickness, bbox = None, d=None, material=None, folder=None):
 
         Iso_FROM_FILE.__init__(self, d=d, material=material, folder=folder)
-        
+
         polygon= np.array(polygon)
         p_min = polygon.min(0)
         p_max = polygon.max(0)
         poly_centre = (p_min+p_max)/2
         poly_size = p_max-p_min
-        
+
         if bbox is None:
             bbox_corner = p_min
             bbox_size = poly_size
-        
+
         elif len(bbox) == 2:
             bbox_corner = poly_centre - np.array(bbox)/2
             bbox_size = np.array(bbox)
@@ -1137,32 +1137,32 @@ class Polygon(Iso_FROM_FILE):
             bbox_size = np.array(bbox[-2:])
         else:
             raise ValueError('Argument bbox must have length 2 or 4')
-    
+
         px_size = np.ceil((bbox_size / self.d)).astype(int)
         scale = min(px_size / bbox_size)
-    
+
         # map the vertices into dipole space
         self.verts = (polygon - bbox_corner)*scale
         path = mpl.path.Path(self.verts)
 
         x, y = np.meshgrid(np.arange(px_size[0]),np.arange(px_size[1]))
-        x, y = x.flatten(), y.flatten()        
+        x, y = x.flatten(), y.flatten()
         xy = np.vstack((x,y)).T
-        
+
         grid = path.contains_points(xy)
         grid = grid.reshape(px_size).astype(int)
-        
+
         self.grid = np.tile(grid, (round(thickness/self.d), 1, 1))
-        
+
         self.origin = np.array(tuple(poly_centre)+(thickness/2.,))
-        
+
 
 ### Periodic Targets
 
 class Periodic(object):
     """Base class for periodic targets
 
-    :param dim: The number of periodic dimensions (1 or 2)    
+    :param dim: The number of periodic dimensions (1 or 2)
     :param period: A 2-tuple which defines the period of the array
                         in the x,y TF directions. (in um)
 
@@ -1177,7 +1177,7 @@ class Periodic(object):
 class FRMFILPBC(FROM_FILE, Periodic):
     """
     Base class for periodic targets of arbitrary geometry.
-    
+
     :param grid: The dipole grid
     :param period: A 2-tuple which defines the period of the array
                         in the x,y TF directions. (in um)
@@ -1191,10 +1191,10 @@ class FRMFILPBC(FROM_FILE, Periodic):
 
     FROMFILPBC does not inherit from Target_Builtin so for the purposes of inheritence
     it is not considered a builtin target.
-        
+
     """
     directive = 'FRMFILPBC'
-    def __init__(self, grid=None, period=(0,0), d=None, material=None, folder=None, fname=None):    
+    def __init__(self, grid=None, period=(0,0), d=None, material=None, folder=None, fname=None):
 
         FROM_FILE.__init__(self, grid=grid, d=d, material=material, folder=folder)
 
@@ -1211,11 +1211,11 @@ class FRMFILPBC(FROM_FILE, Periodic):
     def fromfile(cls, fname):
         """
         Load target definition from the specified .par file.
-        
+
         Assumes that the accompanying shape.dat file is in the same folder.
 
         This function currently assumes that the target basis vectors are
-        orthonormal.        
+        orthonormal.
         """
         vals = cls._read_values(fname)
 
@@ -1223,10 +1223,10 @@ class FRMFILPBC(FROM_FILE, Periodic):
 
         h,_ = os.path.split(fname)
         shape_file = vals['sh_param'][2]
-        shape_file = os.path.join(h, vals['sh_param'][2]) 
+        shape_file = os.path.join(h, vals['sh_param'][2])
         shape = results.ShapeTable(fname=shape_file)
 
-        grid = cls._table2grid(shape.data[:,1:])        
+        grid = cls._table2grid(shape.data[:,1:])
 
         d = cls._calc_size(aeff=aeff, N=len(shape.data))
         period = np.array(vals['sh_param'][:2] * d)
@@ -1237,7 +1237,7 @@ class FRMFILPBC(FROM_FILE, Periodic):
 class RCTGL_PBC(RCTGLPRSM, Periodic):
     """
     A target of periodic rectangular prisms.
-    
+
     :param phys_shape: (length, width, height) of the prism in microns
     :param period: A 2-tuple which defines the period of the array
                         in the x,y TF directions. (in um)
@@ -1248,8 +1248,8 @@ class RCTGL_PBC(RCTGLPRSM, Periodic):
 
     """
     directive = 'RCTGL_PBC'
-    
-    def __init__(self, phys_shape, period, d=None, material=None, folder=None, fname=None):    
+
+    def __init__(self, phys_shape, period, d=None, material=None, folder=None, fname=None):
 
         RCTGLPRSM.__init__(self, phys_shape, d=d, material=material, folder=folder)
 
@@ -1279,14 +1279,14 @@ class RCTGL_PBC(RCTGLPRSM, Periodic):
 class CYLNDRPBC(CYLINDER, Periodic):
     """
     A target of periodic cylinders.
-    
+
     :param length: the length of the cylinder in microns (not including endcaps)
     :param radius: the radius of the cylinder
     :param orient: the orientation of the cylinder
                 SHPAR3 = 1 for cylinder axis aˆ1 ∥ xˆTF: aˆ1 = (1, 0, 0)TF and aˆ2 = (0, 1, 0)TF;
                 SHPAR3 = 2 for cylinder axis aˆ1 ∥ yˆTF: aˆ1 = (0, 1, 0)TF and aˆ2 = (0, 0, 1)TF;
                 SHPAR3 = 3 for cylinder axis aˆ1 ∥ zˆTF: aˆ1 = (0, 0, 1)TF and aˆ2 = (1, 0, 0)TF in the TF.
-    :param period: The periodicity 
+    :param period: The periodicity
     :param period: A 2-tuple which defines the period of the array
                         in the x,y TF directions. (in um)
     :param d: The dipole density. Default is taken from targets.default_d.
@@ -1295,8 +1295,8 @@ class CYLNDRPBC(CYLINDER, Periodic):
     :param folder: The target working directory. The default is the CWD.
 
     """
-    
-    def __init__(self, length, radius, orient, period, d=None, material=None, folder=None):    
+
+    def __init__(self, length, radius, orient, period, d=None, material=None, folder=None):
 
 
         CYLINDER.__init__(self, length, radius, orient, d=d, material=material, folder=folder)
@@ -1324,7 +1324,7 @@ class CYLNDRPBC(CYLINDER, Periodic):
         period = phys_shape[3:4]
         return cls(length, radius, orient, period, d, vals['material'])
 
-#: A dict which translates between a finite isolated target class and its 
+#: A dict which translates between a finite isolated target class and its
 #: corresponding (semi)infite periodic partner. The keys are the classes of
 #: the isolated target, and the values are the classes of the periodic ones.
 cls_conversion={RCTGLPRSM:RCTGL_PBC,
@@ -1334,25 +1334,25 @@ cls_conversion={RCTGLPRSM:RCTGL_PBC,
 def Holify(target, radius, posns=None, num=None, seed=None):
     """
     Punches holes into a target
-    
+
     radius: the radius of the holes to be punched (in units of d)
 
-    Where to punch the holes can be specified by:    
-    
+    Where to punch the holes can be specified by:
+
     posns: a list of the x,y,z positions to punch the holes
-    
-    or    
-    
+
+    or
+
     num: the number of holes. their positions are selected randomly
     seed: a seed value to use for the random number generator
-    
+
     """
     d_shape=target.grid.shape
-    
+
     if posns is None:
         if num is None:
             raise ValueError('Either posns or num must be specificed')
-        
+
         posns=np.random.rand(num, 3)
         for (p, s) in zip(posns.T, d_shape):
             p *= s
@@ -1360,27 +1360,26 @@ def Holify(target, radius, posns=None, num=None, seed=None):
     posns=np.asarray(posns, dtype=np.int16)
 
     r=np.ceil(radius)
-    xx,yy,zz=np.mgrid[-(r+1):r+1, -(r+1):r+1, -(r+1):r+1] 
+    xx,yy,zz=np.mgrid[-(r+1):r+1, -(r+1):r+1, -(r+1):r+1]
     dist=np.sqrt(xx**2 + yy**2 + zz**2)
     mask=np.array(np.where(dist<r))
-    
+
     new_target=target.copy()
     grid=np.ravel(new_target.grid)
-    print grid.sum()
-    
+    print(grid.sum())
+
     for p in posns:
         p=p[:, np.newaxis]
-#        print p            
+#        print p
         mask_r=np.ravel_multi_index(mask+p, d_shape, mode='clip')
-        print mask_r[0]
+        print(mask_r[0])
 #        g_len=grid.sum()
-        print grid[mask_r[0]]
+        print(grid[mask_r[0]])
         grid[mask_r] &= False
-        print grid[mask_r[0]]
+        print(grid[mask_r[0]])
 
 #        print g_len, '->', grid.sum()
 
-    print grid.sum()
+    print(grid.sum())
     new_target.N = new_target.grid.sum()
     return new_target
-    

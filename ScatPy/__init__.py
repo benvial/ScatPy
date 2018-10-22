@@ -11,8 +11,8 @@ It includes a number of submodules:
   -utils: a handful of common utilities
 
 """
-import core
-import utils
+from . import core
+from . import utils
 
 # Create profile folder in user home directory if one does not already exist.
 try:
@@ -20,13 +20,15 @@ try:
 except IOError:
     pass
 
-import fileio
-import ranges
-import results
-import targets
+from . import fileio
+from . import ranges
+from . import results
+import importlib
+importlib.reload(results)
+from . import targets
 
-from core import (DDscat, Settings, set_config)
-from core import (pol_cL, pol_cR, pol_lV, pol_lH)
+from .core import (DDscat, Settings, set_config)
+from .core import (pol_cL, pol_cR, pol_lV, pol_lH)
 
 __all__=["DDscat", "Settings", "set_config", "ranges", "results", "targets", "fileio", "utils",
          'pol_cL', 'pol_cR', 'pol_lV', 'pol_lH']
@@ -37,4 +39,3 @@ try:
     del v
 except ImportError:
     __version__ = "UNKNOWN"
-    
