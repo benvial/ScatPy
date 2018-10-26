@@ -772,20 +772,20 @@ class FROM_FILE(Target):
         Z=table[:, 2][::mask_points]
         c=table[:, 3][::mask_points]
 
-        # Draw box representing the target volume
-        sp = self.sh_param
-        #box vertices
-        v0, v1, v2, v3 = (0,0,0), (0, sp[1], 0), (0, sp[1], sp[2]), (0, 0, sp[2])
-        v4, v5, v6, v7 = (sp[0],0,0), (sp[0], sp[1], 0), (sp[0], sp[1], sp[2]), (sp[0], 0, sp[2])
-
-        Box = np.array([v0, v1, v2, v3, v0, v4, v5, v6, v7, v4, v7, v3, v2, v6, v5, v1])
-        mlab.plot3d(Box[:,0], Box[:,1], Box[:,2], name='Target Volume')
+        # # Draw box representing the target volume
+        # sp = self.sh_param
+        # #box vertices
+        # v0, v1, v2, v3 = (0,0,0), (0, sp[1], 0), (0, sp[1], sp[2]), (0, 0, sp[2])
+        # v4, v5, v6, v7 = (sp[0],0,0), (sp[0], sp[1], 0), (sp[0], sp[1], sp[2]), (sp[0], 0, sp[2])
+        #
+        # Box = np.array([v0, v1, v2, v3, v0, v4, v5, v6, v7, v4, v7, v3, v2, v6, v5, v1])
+        # mlab.plot3d(Box[:,0], Box[:,1], Box[:,2], name='Target Volume')
 
 
         # Draw the target
         #
         # Create unconnected points
-        pts = mlab.pipeline.scalar_scatter(X,Y,Z, c, name='Dipoles') #, scale_mode='none', *args, **kwargs)
+        pts = mlab.pipeline.scalar_scatter(X,Y,Z, c, name='Dipoles', **kwargs)
 #        mlab.outline(pts)
 
         # Use a geometry_filter to filter with a bounding box
@@ -810,7 +810,11 @@ class FROM_FILE(Target):
         spheres = mlab.pipeline.glyph(clip, scale_mode='none')
 
   #      mlab.points3d(X, Y, Z, c, scale_mode='none', *args, **kwargs)
+
+
         mlab.show()
+
+
 
 
 
